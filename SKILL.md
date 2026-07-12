@@ -1,17 +1,17 @@
 ---
 name: web-demo-recorder
-description: Record reproducible web frontend demos with browser automation, cursor trails, diagnostics, MP4 export, and optional timeline-based voiceover narration.
+description: Use when the user asks to record a web app flow, produce an MP4/WebM guided demo, show cursor/click traces, diagnose console/network errors during recording, or add timeline voiceover narration to an operation video.
 ---
 
 # Web Demo Recorder
 
-Use this skill when the user wants to record a web frontend operation as a clean demo video, especially when the output should be shareable, reproducible, and easy for another person to follow. The loop is: stabilize the app, script the flow, record with visible cursor traces, inspect browser diagnostics, optionally add narration, and deliver the final video path.
+Use this skill to create a **guided demo**: a reproducible web operation video with scripted browser steps, visible cursor traces, recording diagnostics, and optional narration.
 
-## Recorder Loop
+## Guided Demo Loop
 
-1. **Stabilize the app.** Confirm the target URL loads, required services are running, test users/data exist, and no stale browser auth state will leak into the run. Completion criterion: a fresh browser can reach the starting page and the flow's required data is present.
+1. **Stabilize the app.** Confirm the target URL loads, required services are running, test users/data exist, and no stale browser auth state will leak into the run. Completion criterion: a fresh browser reaches the starting page and the flow's required data is present.
 
-2. **Choose the artifact folder.** Put scenario scripts, reports, videos, frames, narration scripts, and final media under the user's requested folder; otherwise use a project-local generated/output folder. Completion criterion: all new artifacts have absolute paths and no unrelated repo files are touched.
+2. **Choose the artifact folder.** Put scenario scripts, reports, videos, frames, narration scripts, and final media under the user's requested folder; otherwise use a project-local generated/output folder. Completion criterion: every new artifact has an absolute path and no unrelated repo files are touched.
 
 3. **Create a scenario script.** Write a CommonJS file that exports `async function run({ page, recorder })`. Keep app-specific credentials, IDs, route paths, and workflow decisions in this scenario, not in the reusable recorder. Completion criterion: the scenario expresses every visible user step in order and uses recorder helpers for clicks, fills, waits, and scrolls.
 
@@ -23,9 +23,9 @@ Use this skill when the user wants to record a web frontend operation as a clean
 
 7. **Add voiceover when requested.** Create a timeline JSON with short narration segments, generate the voiceover, and mix it into the video with `scripts/add-voiceover.cjs`. Completion criterion: the final video has an audio stream, narration segments do not overlap unintentionally, and the narration ends before the video ends.
 
-## Bundled Recorder
+## Quick Commands
 
-Run from any repository:
+Record a guided demo:
 
 ```bash
 NODE_PATH=/tmp/web-demo-recorder/node_modules \
@@ -38,21 +38,24 @@ node /path/to/web-demo-recorder/scripts/record-web-operation.cjs \
   --cursor-trail
 ```
 
-If Playwright is not installed in the current project, install it outside the repo:
+Add voiceover:
 
 ```bash
-mkdir -p /tmp/web-demo-recorder
-cd /tmp/web-demo-recorder
-npm init -y >/dev/null
-npm install playwright@latest
-npx playwright install chromium
+node /path/to/web-demo-recorder/scripts/add-voiceover.cjs \
+  --input /absolute/path/to/demo.mp4 \
+  --timeline /absolute/path/to/voiceover.json \
+  --output /absolute/path/to/demo-voiceover.mp4
 ```
 
-The recorder requires `ffmpeg` for MP4 conversion and frame extraction. If `ffmpeg` is missing, produce WebM and say MP4 conversion is blocked.
+For setup, scenario details, and voiceover formats, read the references only when needed:
+
+- `references/install.md`
+- `references/scenario.md`
+- `references/voiceover.md`
 
 ## Scenario Contract
 
-Create scenario files like this:
+Create scenario files like this. Use `recorder.step(name)` before meaningful phases when a scenario does custom Playwright work; diagnostics will include the current step.
 
 ```js
 exports.run = async ({ page, recorder }) => {
@@ -65,8 +68,6 @@ exports.run = async ({ page, recorder }) => {
   await recorder.scrollTo(600);
 };
 ```
-
-Use `recorder.step(name)` before meaningful phases when a scenario does custom Playwright work; diagnostics will include the current step.
 
 Available helpers:
 
@@ -82,7 +83,7 @@ Available helpers:
 
 ## Voiceover Contract
 
-Create a timeline file like this:
+Create a timeline file with generated narration:
 
 ```json
 {
@@ -95,16 +96,18 @@ Create a timeline file like this:
 }
 ```
 
-Then run:
+Or use pre-rendered audio clips for non-macOS environments:
 
-```bash
-node /path/to/web-demo-recorder/scripts/add-voiceover.cjs \
-  --input /absolute/path/to/demo.mp4 \
-  --timeline /absolute/path/to/voiceover.json \
-  --output /absolute/path/to/demo-voiceover.mp4
+```json
+{
+  "segments": [
+    { "start": 0.4, "audioFile": "/absolute/path/to/segment-01.wav" },
+    { "start": 4.5, "audioFile": "/absolute/path/to/segment-02.wav" }
+  ]
+}
 ```
 
-The voiceover helper uses macOS `say` for local TTS and `ffmpeg` for mixing. If `say` is unavailable, use another TTS workflow to create audio clips, then adapt the timeline or mix manually with `ffmpeg`.
+Generated narration uses macOS `say`. Timeline segments with `audioFile`, or files found via `--audio-dir`, do not require `say`.
 
 ## Quality Rules
 

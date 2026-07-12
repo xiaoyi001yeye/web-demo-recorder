@@ -1,4 +1,4 @@
 interface:
   display_name: "Web Demo Recorder"
-  short_description: "Record clean web demos with cursor trails and voiceover"
-  default_prompt: "Use $web-demo-recorder to record a web frontend operation as an MP4 demo with cursor trails, diagnostics, and optional voiceover narration."
+  short_description: "Record guided web demos with cursor traces and voiceover"
+  default_prompt: "Use $web-demo-recorder to record a web app flow as a guided MP4 demo with cursor traces, diagnostics, and optional timeline voiceover."

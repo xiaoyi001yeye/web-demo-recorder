@@ -34,7 +34,7 @@ function requirePlaywright() {
   try {
     return require('playwright');
   } catch (error) {
-    throw new Error('Cannot find playwright. Install it in the project or set NODE_PATH to a temp install, e.g. /tmp/web-operation-recorder/node_modules.');
+    throw new Error('Cannot find playwright. Install it in the project or set NODE_PATH to a temp install, e.g. /tmp/web-demo-recorder/node_modules.');
   }
 }
 
@@ -101,66 +101,66 @@ async function main() {
     if (!args.cursorTrail) return;
     await page.evaluate((pos) => {
       if (!document.body) return;
-      if (!document.getElementById('web-operation-recorder-style')) {
+      if (!document.getElementById('web-demo-recorder-style')) {
         const style = document.createElement('style');
-        style.id = 'web-operation-recorder-style';
+        style.id = 'web-demo-recorder-style';
         style.textContent = `
           html, body, body * { cursor: none !important; }
-          #web-operation-recorder-cursor {
+          #web-demo-recorder-cursor {
             position: fixed; left: 0; top: 0; width: 22px; height: 22px;
             z-index: 2147483647; pointer-events: none;
             transform: translate(${pos.x}px, ${pos.y}px); transition: transform 24ms linear;
           }
-          #web-operation-recorder-cursor::before {
+          #web-demo-recorder-cursor::before {
             content: ""; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px;
             border-radius: 50%; background: #2563eb; border: 3px solid white;
             box-shadow: 0 3px 14px rgba(37, 99, 235, 0.45);
           }
-          .web-operation-recorder-trail {
+          .web-demo-recorder-trail {
             position: fixed; width: 12px; height: 12px; margin-left: 5px; margin-top: 5px;
             border-radius: 999px; background: rgba(37, 99, 235, 0.28);
             z-index: 2147483646; pointer-events: none;
-            animation: web-operation-recorder-trail-fade 900ms ease-out forwards;
+            animation: web-demo-recorder-trail-fade 900ms ease-out forwards;
           }
-          .web-operation-recorder-click {
+          .web-demo-recorder-click {
             position: fixed; width: 44px; height: 44px; margin-left: -11px; margin-top: -11px;
             border-radius: 999px; border: 3px solid rgba(37, 99, 235, 0.65);
             z-index: 2147483646; pointer-events: none;
-            animation: web-operation-recorder-click-pulse 620ms ease-out forwards;
+            animation: web-demo-recorder-click-pulse 620ms ease-out forwards;
           }
-          @keyframes web-operation-recorder-trail-fade {
+          @keyframes web-demo-recorder-trail-fade {
             from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.35); }
           }
-          @keyframes web-operation-recorder-click-pulse {
+          @keyframes web-demo-recorder-click-pulse {
             from { opacity: 0.9; transform: scale(0.4); } to { opacity: 0; transform: scale(1.35); }
           }
         `;
         document.head.appendChild(style);
       }
-      let cursorEl = document.getElementById('web-operation-recorder-cursor');
+      let cursorEl = document.getElementById('web-demo-recorder-cursor');
       if (!cursorEl) {
         cursorEl = document.createElement('div');
-        cursorEl.id = 'web-operation-recorder-cursor';
+        cursorEl.id = 'web-demo-recorder-cursor';
         document.body.appendChild(cursorEl);
       }
-      window.__webOperationRecorderMove = (x, y, click = false) => {
+      window.__webDemoRecorderMove = (x, y, click = false) => {
         cursorEl.style.transform = `translate(${x}px, ${y}px)`;
         const trail = document.createElement('span');
-        trail.className = 'web-operation-recorder-trail';
+        trail.className = 'web-demo-recorder-trail';
         trail.style.left = `${x}px`;
         trail.style.top = `${y}px`;
         document.body.appendChild(trail);
         window.setTimeout(() => trail.remove(), 950);
         if (click) {
           const ring = document.createElement('span');
-          ring.className = 'web-operation-recorder-click';
+          ring.className = 'web-demo-recorder-click';
           ring.style.left = `${x}px`;
           ring.style.top = `${y}px`;
           document.body.appendChild(ring);
           window.setTimeout(() => ring.remove(), 700);
         }
       };
-      window.__webOperationRecorderMove(pos.x, pos.y, false);
+      window.__webDemoRecorderMove(pos.x, pos.y, false);
     }, cursor).catch(() => {});
   }
 
@@ -175,13 +175,13 @@ async function main() {
       const ny = Math.round(start.y + (y - start.y) * eased);
       await page.mouse.move(nx, ny);
       if (args.cursorTrail) {
-        await page.evaluate(([px, py]) => window.__webOperationRecorderMove?.(px, py, false), [nx, ny]).catch(() => {});
+        await page.evaluate(([px, py]) => window.__webDemoRecorderMove?.(px, py, false), [nx, ny]).catch(() => {});
       }
       await page.waitForTimeout(10);
     }
     cursor = { x, y };
     if (options.click && args.cursorTrail) {
-      await page.evaluate(([px, py]) => window.__webOperationRecorderMove?.(px, py, true), [x, y]).catch(() => {});
+      await page.evaluate(([px, py]) => window.__webDemoRecorderMove?.(px, py, true), [x, y]).catch(() => {});
     }
   }
 
@@ -278,10 +278,12 @@ async function main() {
   const framePath = path.join(outDir, `${baseName}-frame.png`);
   if (hasCommand('ffmpeg')) {
     execFileSync('ffmpeg', [
-      '-hide_banner', '-loglevel', 'error', '-y', '-ss', '00:00:02',
+      '-hide_banner', '-loglevel', 'error', '-y',
       '-i', finalVideo, '-frames:v', '1', framePath,
     ], { stdio: 'inherit' });
-    fs.copyFileSync(framePath, path.join(outDir, `${args.name}-frame.png`));
+    if (fs.existsSync(framePath)) {
+      fs.copyFileSync(framePath, path.join(outDir, `${args.name}-frame.png`));
+    }
   }
 
   const summary = events.reduce((acc, event) => {

@@ -9,6 +9,7 @@ function parseArgs(argv) {
     rate: null,
     volume: 1.35,
     workDir: null,
+    audioDir: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -44,7 +45,6 @@ function readTimeline(file) {
   }
   for (const [index, segment] of timeline.segments.entries()) {
     if (typeof segment.start !== 'number') throw new Error(`segments[${index}].start must be a number.`);
-    if (!segment.text) throw new Error(`segments[${index}].text is required.`);
   }
   return timeline;
 }
@@ -57,11 +57,21 @@ function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
+function findAudioFile(audioDir, index) {
+  if (!audioDir) return null;
+  const base = `segment-${String(index + 1).padStart(2, '0')}`;
+  const extensions = ['wav', 'mp3', 'm4a', 'aac', 'aiff', 'aif', 'flac', 'ogg'];
+  for (const extension of extensions) {
+    const candidate = path.join(audioDir, `${base}.${extension}`);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!hasCommand('ffmpeg')) throw new Error('ffmpeg is required to mix voiceover into the video.');
   if (!hasCommand('ffprobe')) throw new Error('ffprobe is required to inspect media durations.');
-  if (!hasCommand('say')) throw new Error('macOS say is required for local TTS voiceover generation.');
 
   const input = path.resolve(args.input);
   const output = path.resolve(args.output);
@@ -71,18 +81,31 @@ function main() {
   const voice = args.voice || timeline.voice || 'Tingting';
   const rate = String(args.rate || timeline.rate || 220);
   const workDir = path.resolve(args.workDir || path.join(path.dirname(output), `voiceover-work-${stamp()}`));
+  const audioDir = args.audioDir ? path.resolve(args.audioDir) : null;
   fs.mkdirSync(workDir, { recursive: true });
   fs.mkdirSync(path.dirname(output), { recursive: true });
 
   const audioFiles = [];
   const segments = timeline.segments.map((segment, index) => {
-    const audioFile = path.join(workDir, `segment-${String(index + 1).padStart(2, '0')}.aiff`);
-    execFileSync('say', ['-v', voice, '-r', rate, '-o', audioFile, segment.text], { stdio: 'inherit' });
+    let audioFile = segment.audioFile ? path.resolve(segment.audioFile) : findAudioFile(audioDir, index);
+    const generated = !audioFile;
+    if (generated) {
+      if (!segment.text) {
+        throw new Error(`segments[${index}] must contain text, audioFile, or a matching file in --audio-dir.`);
+      }
+      if (!hasCommand('say')) {
+        throw new Error(`macOS say is required to generate segments[${index}]. Provide audioFile or --audio-dir for pre-rendered narration.`);
+      }
+      audioFile = path.join(workDir, `segment-${String(index + 1).padStart(2, '0')}.aiff`);
+      execFileSync('say', ['-v', voice, '-r', rate, '-o', audioFile, segment.text], { stdio: 'inherit' });
+    }
+    if (!fs.existsSync(audioFile)) throw new Error(`Audio file not found for segments[${index}]: ${audioFile}`);
     const duration = ffprobeDuration(audioFile);
     audioFiles.push(audioFile);
     return {
       ...segment,
       audioFile,
+      generated,
       duration,
       end: Number((segment.start + duration).toFixed(3)),
     };
@@ -124,6 +147,7 @@ function main() {
     output,
     timeline: timelinePath,
     workDir,
+    audioDir,
     voice,
     rate: Number(rate),
     volume: args.volume,
